@@ -11,7 +11,18 @@ function answerQuery(q: string, data: ReturnType<typeof useStore>["data"]): stri
   const now = new Date();
   const monthAgo = new Date(now.getFullYear(), now.getMonth(), 1);
 
-  if (/spend|spent|expense/.test(lower) && /month/.test(lower)) {
+  if (/\b(time|today time|current time|what time|time now)\b/.test(lower)) {
+    return `It is ${now.toLocaleTimeString("en-IN", { hour: "numeric", minute: "2-digit" })} right now.`;
+  }
+  if (/\b(date|today date|current date|what day|day today)\b/.test(lower)) {
+    return `Today is ${now.toLocaleDateString("en-IN", {
+      weekday: "long",
+      year: "numeric",
+      month: "long",
+      day: "numeric",
+    })}.`;
+  }
+  if (/spend|spent|expense/.test(lower) && /month|today|this week|this month/.test(lower)) {
     const total = data.expenses
       .filter((e) => new Date(e.date) >= monthAgo)
       .reduce((s, e) => s + e.amount, 0);
@@ -21,13 +32,17 @@ function answerQuery(q: string, data: ReturnType<typeof useStore>["data"]): stri
     const m = new Map<string, number>();
     data.expenses.forEach((e) => m.set(e.category, (m.get(e.category) ?? 0) + e.amount));
     const top = [...m.entries()].sort((a, b) => b[1] - a[1])[0];
-    return top ? `Your highest expense category is ${top[0]} at ${inr(top[1])}.` : "No expense data yet.";
+    return top
+      ? `Your highest expense category is ${top[0]} at ${inr(top[1])}.`
+      : "No expense data yet.";
   }
   if (/save|saving/.test(lower)) {
     return "Tip: Review recurring expenses, cap discretionary categories like Shopping and Travel by 15%, and set automatic SIPs on payday. Even ₹5,000/month invested at 12% becomes ₹11.5L in 10 years.";
   }
   if (/fuel/.test(lower)) {
-    const fuel = data.expenses.filter((e) => e.category === "Fuel").reduce((s, e) => s + e.amount, 0);
+    const fuel = data.expenses
+      .filter((e) => e.category === "Fuel")
+      .reduce((s, e) => s + e.amount, 0);
     return `You've spent ${inr(fuel)} on fuel in total across ${data.expenses.filter((e) => e.category === "Fuel").length} fill-ups.`;
   }
   if (/insurance|expire/.test(lower)) {
@@ -40,7 +55,9 @@ function answerQuery(q: string, data: ReturnType<typeof useStore>["data"]): stri
   }
   if (/emi|loan/.test(lower)) {
     if (!data.loans.length) return "You haven't added any loans yet.";
-    const lines = data.loans.map((l) => `${l.name}: EMI ≈ ${inr(calcEmi(l.principal, l.rate, l.tenureMonths))}/month`);
+    const lines = data.loans.map(
+      (l) => `${l.name}: EMI ≈ ${inr(calcEmi(l.principal, l.rate, l.tenureMonths))}/month`,
+    );
     return `Here are your loans:\n• ${lines.join("\n• ")}`;
   }
   if (/document|file/.test(lower)) {
@@ -50,14 +67,18 @@ function answerQuery(q: string, data: ReturnType<typeof useStore>["data"]): stri
     const pending = data.notes.filter((n) => n.status === "Pending");
     return `You have ${pending.length} pending task${pending.length === 1 ? "" : "s"}. ${pending[0] ? `Next up: "${pending[0].title}".` : ""}`;
   }
-  return "I can help with expenses, documents, loans, and reminders. Try: \"How much did I spend this month?\", \"When does my insurance expire?\", or \"What's my pending EMI?\"";
+  return 'I can help with expenses, documents, loans, and reminders. Try: "How much did I spend this month?", "When does my insurance expire?", or "What\'s my pending EMI?"';
 }
 
 export function AIAssistant() {
   const [open, setOpen] = useState(false);
   const [input, setInput] = useState("");
+  const [loading, setLoading] = useState(false);
   const [msgs, setMsgs] = useState<Msg[]>([
-    { role: "ai", text: "Hi Dad 👋 I'm your DadDesk AI. Ask me about expenses, loans, documents or reminders." },
+    {
+      role: "ai",
+      text: "Hi Dad 👋 I'm your DadDesk AI. Ask me about expenses, loans, documents or reminders.",
+    },
   ]);
   const { data } = useStore();
   const scrollRef = useRef<HTMLDivElement>(null);
@@ -66,12 +87,37 @@ export function AIAssistant() {
     scrollRef.current?.scrollTo({ top: scrollRef.current.scrollHeight, behavior: "smooth" });
   }, [msgs, open]);
 
-  const send = () => {
+  const send = async () => {
     const text = input.trim();
-    if (!text) return;
-    const reply = answerQuery(text, data);
-    setMsgs((m) => [...m, { role: "user", text }, { role: "ai", text: reply }]);
+    if (!text || loading) return;
+    setMsgs((m) => [...m, { role: "user", text }]);
     setInput("");
+    setLoading(true);
+
+    let reply = "";
+    try {
+      const response = await fetch("/api/gemini-chat", {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({
+          message: text,
+          context: data,
+        }),
+      });
+
+      if (response.ok) {
+        const result = (await response.json()) as { reply?: string };
+        reply = result.reply?.trim() || answerQuery(text, data);
+      } else {
+        reply = answerQuery(text, data);
+      }
+    } catch {
+      reply = answerQuery(text, data);
+    } finally {
+      setLoading(false);
+    }
+
+    setMsgs((m) => [...m, { role: "ai", text: reply }]);
   };
 
   const suggestions = [
@@ -100,7 +146,7 @@ export function AIAssistant() {
             animate={{ opacity: 1, y: 0, scale: 1 }}
             exit={{ opacity: 0, y: 20, scale: 0.96 }}
             transition={{ type: "spring", stiffness: 280, damping: 28 }}
-            className="fixed bottom-24 right-5 z-50 flex h-[32rem] w-[22rem] max-w-[calc(100vw-2.5rem)] flex-col overflow-hidden rounded-3xl border border-border bg-card shadow-glow"
+            className="fixed bottom-24 right-5 z-50 flex h-128 w-88 max-w-[calc(100vw-2.5rem)] flex-col overflow-hidden rounded-3xl border border-border bg-card shadow-glow"
           >
             <div className="flex items-center gap-3 bg-gradient-brand px-5 py-4 text-white">
               <div className="grid h-9 w-9 place-items-center rounded-full bg-white/20">
@@ -114,7 +160,10 @@ export function AIAssistant() {
 
             <div ref={scrollRef} className="flex-1 space-y-3 overflow-y-auto px-4 py-4">
               {msgs.map((m, i) => (
-                <div key={i} className={m.role === "user" ? "flex justify-end" : "flex justify-start"}>
+                <div
+                  key={i}
+                  className={m.role === "user" ? "flex justify-end" : "flex justify-start"}
+                >
                   <div
                     className={
                       m.role === "user"
@@ -134,7 +183,11 @@ export function AIAssistant() {
                   <button
                     key={s}
                     onClick={() => {
-                      setMsgs((m) => [...m, { role: "user", text: s }, { role: "ai", text: answerQuery(s, data) }]);
+                      setMsgs((m) => [
+                        ...m,
+                        { role: "user", text: s },
+                        { role: "ai", text: answerQuery(s, data) },
+                      ]);
                     }}
                     className="rounded-full border border-border bg-background px-3 py-1 text-xs text-muted-foreground transition-colors hover:bg-accent hover:text-accent-foreground"
                   >
@@ -152,7 +205,7 @@ export function AIAssistant() {
                 placeholder="Ask anything…"
                 className="flex-1 rounded-full border border-border bg-card px-4 py-2 text-sm outline-none focus:ring-2 focus:ring-ring"
               />
-              <Button size="icon" onClick={send} className="rounded-full">
+              <Button size="icon" onClick={send} className="rounded-full" disabled={loading}>
                 <Send className="h-4 w-4" />
               </Button>
             </div>

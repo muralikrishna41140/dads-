@@ -3,11 +3,24 @@ import { useMemo, useState } from "react";
 import { Plus, Trash2, Calculator } from "lucide-react";
 import { useStore, inr, calcEmi, loanProgress, LOAN_TYPES } from "@/lib/store";
 import { AppShell } from "@/components/AppShell";
+import { useI18n } from "@/lib/i18n";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogTrigger,
+} from "@/components/ui/dialog";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 import { toast } from "sonner";
 
 export const Route = createFileRoute("/loans")({
@@ -17,6 +30,7 @@ export const Route = createFileRoute("/loans")({
 
 function Loans() {
   const { data, addLoan, deleteLoan } = useStore();
+  const { t } = useI18n();
   const [selected, setSelected] = useState<string | null>(data.loans[0]?.id ?? null);
   const [filter, setFilter] = useState<"upcoming" | "overdue" | "smallest" | "largest">("upcoming");
   const [calcOpen, setCalcOpen] = useState(false);
@@ -35,7 +49,12 @@ function Loans() {
     for (let i = 1; i <= active.tenureMonths; i++) {
       const due = new Date(start);
       due.setMonth(start.getMonth() + i);
-      const status = due < now ? "Paid" : i === Math.ceil((+now - +start) / (1000 * 60 * 60 * 24 * 30.44)) + 1 ? "Due" : "Upcoming";
+      const status =
+        due < now
+          ? "Paid"
+          : i === Math.ceil((+now - +start) / (1000 * 60 * 60 * 24 * 30.44)) + 1
+            ? "Due"
+            : "Upcoming";
       rows.push({ n: i, due, amount: emi, status });
     }
     if (filter === "upcoming") return rows.filter((r) => r.status !== "Paid").slice(0, 12);
@@ -45,29 +64,34 @@ function Loans() {
   }, [active, filter]);
 
   return (
-    <AppShell title="Bank & Loans" subtitle="EMIs, schedules, and full visibility">
+    <AppShell title={t("loans.title")} subtitle={t("loans.subtitle")}>
       <div className="grid gap-4 sm:grid-cols-3">
         <div className="rounded-3xl border border-border bg-card p-5 shadow-soft">
-          <div className="text-xs text-muted-foreground">Active Loans</div>
+          <div className="text-xs text-muted-foreground">{t("loans.activeLoans")}</div>
           <div className="mt-1 font-display text-2xl font-bold">{data.loans.length}</div>
         </div>
         <div className="rounded-3xl border border-border bg-card p-5 shadow-soft">
-          <div className="text-xs text-muted-foreground">Total Principal</div>
+          <div className="text-xs text-muted-foreground">{t("loans.totalPrincipal")}</div>
           <div className="mt-1 font-display text-2xl font-bold">{inr(totalPrincipal)}</div>
         </div>
         <div className="rounded-3xl bg-gradient-brand p-5 text-white shadow-glow">
-          <div className="text-xs text-white/85">Monthly EMI</div>
+          <div className="text-xs text-white/85">{t("loans.monthlyEmi")}</div>
           <div className="mt-1 font-display text-2xl font-bold">{inr(Math.round(totalEmi))}</div>
         </div>
       </div>
 
       <div className="mt-6 flex flex-wrap items-center justify-between gap-3">
-        <h3 className="font-display text-lg font-bold">Your loans</h3>
+        <h3 className="font-display text-lg font-bold">{t("loans.yourLoans")}</h3>
         <div className="flex gap-2">
           <Button variant="outline" className="rounded-full" onClick={() => setCalcOpen(true)}>
-            <Calculator className="mr-1.5 h-4 w-4" /> Interest Calculator
+            <Calculator className="mr-1.5 h-4 w-4" /> {t("loans.interestCalculator")}
           </Button>
-          <AddLoan onAdd={(l) => { addLoan(l); toast.success("Loan added"); }} />
+          <AddLoan
+            onAdd={(l) => {
+              addLoan(l);
+              toast.success(t("loans.loanAdded"));
+            }}
+          />
         </div>
       </div>
 
@@ -78,42 +102,60 @@ function Loans() {
           const prog = loanProgress(l);
           const isActive = active?.id === l.id;
           return (
-            <button
+            <div
               key={l.id}
               onClick={() => setSelected(l.id)}
+              role="button"
+              tabIndex={0}
+              onKeyDown={(e) => {
+                if (e.key === "Enter" || e.key === " ") {
+                  e.preventDefault();
+                  setSelected(l.id);
+                }
+              }}
               className={`group relative overflow-hidden rounded-3xl border bg-card p-6 text-left shadow-soft transition-all hover:-translate-y-0.5 hover:shadow-elegant ${isActive ? "border-primary ring-2 ring-primary/20" : "border-border"}`}
             >
               <div className="flex items-start justify-between">
                 <div className="min-w-0">
-                  <div className="text-xs uppercase tracking-wide text-muted-foreground">{l.type}</div>
+                  <div className="text-xs uppercase tracking-wide text-muted-foreground">
+                    {l.type}
+                  </div>
                   <div className="font-display text-xl font-bold">{l.name}</div>
                 </div>
                 <CircularProgress pct={prog.pct} />
               </div>
               <div className="mt-4 grid grid-cols-3 gap-3 text-sm">
                 <div>
-                  <div className="text-xs text-muted-foreground">Principal</div>
+                  <div className="text-xs text-muted-foreground">{t("loans.principal")}</div>
                   <div className="font-semibold">{inr(l.principal)}</div>
                 </div>
                 <div>
-                  <div className="text-xs text-muted-foreground">EMI</div>
+                  <div className="text-xs text-muted-foreground">{t("loans.emi")}</div>
                   <div className="font-semibold">{inr(Math.round(emi))}</div>
                 </div>
                 <div>
-                  <div className="text-xs text-muted-foreground">Interest</div>
+                  <div className="text-xs text-muted-foreground">{t("loans.interest")}</div>
                   <div className="font-semibold">{inr(Math.round(totalInterest))}</div>
                 </div>
               </div>
               <div className="mt-4 text-xs text-muted-foreground">
-                {prog.paid}/{l.tenureMonths} months paid · {prog.remaining} remaining
+                {t("loans.monthsPaid", {
+                  paid: prog.paid,
+                  total: l.tenureMonths,
+                  remaining: prog.remaining,
+                })}
               </div>
               <button
-                onClick={(e) => { e.stopPropagation(); deleteLoan(l.id); toast("Loan removed"); }}
+                onClick={(e) => {
+                  e.stopPropagation();
+                  deleteLoan(l.id);
+                  toast(t("loans.loanRemoved"));
+                }}
                 className="absolute right-4 top-4 rounded-lg p-1.5 text-muted-foreground opacity-0 transition-opacity hover:bg-destructive/10 hover:text-destructive group-hover:opacity-100"
               >
                 <Trash2 className="h-4 w-4" />
               </button>
-            </button>
+            </div>
           );
         })}
       </div>
@@ -121,7 +163,9 @@ function Loans() {
       {active && (
         <div className="mt-8 rounded-3xl border border-border bg-card p-6 shadow-soft">
           <div className="flex flex-wrap items-center justify-between gap-3">
-            <h3 className="font-display text-lg font-bold">Schedule · {active.name}</h3>
+            <h3 className="font-display text-lg font-bold">
+              {t("loans.schedule", { name: active.name })}
+            </h3>
             <div className="inline-flex rounded-full border border-border bg-background p-1 text-xs">
               {(["upcoming", "overdue", "smallest", "largest"] as const).map((f) => (
                 <button
@@ -139,9 +183,9 @@ function Loans() {
               <thead className="text-xs uppercase text-muted-foreground">
                 <tr className="border-b border-border">
                   <th className="px-3 py-2 text-left">#</th>
-                  <th className="px-3 py-2 text-left">Due Date</th>
-                  <th className="px-3 py-2 text-right">Amount</th>
-                  <th className="px-3 py-2 text-right">Status</th>
+                  <th className="px-3 py-2 text-left">{t("loans.dueDate")}</th>
+                  <th className="px-3 py-2 text-right">{t("loans.amount")}</th>
+                  <th className="px-3 py-2 text-right">{t("loans.status")}</th>
                 </tr>
               </thead>
               <tbody>
@@ -149,13 +193,25 @@ function Loans() {
                   <tr key={r.n} className="border-b border-border/50 last:border-0">
                     <td className="px-3 py-2.5 font-medium">{r.n}</td>
                     <td className="px-3 py-2.5">{r.due.toLocaleDateString()}</td>
-                    <td className="px-3 py-2.5 text-right font-semibold">{inr(Math.round(r.amount))}</td>
+                    <td className="px-3 py-2.5 text-right font-semibold">
+                      {inr(Math.round(r.amount))}
+                    </td>
                     <td className="px-3 py-2.5 text-right">
-                      <span className={`rounded-full px-2 py-0.5 text-xs font-medium ${
-                        r.status === "Paid" ? "bg-success/15 text-success" :
-                        r.status === "Due" ? "bg-destructive/15 text-destructive" :
-                        "bg-muted text-muted-foreground"
-                      }`}>{r.status}</span>
+                      <span
+                        className={`rounded-full px-2 py-0.5 text-xs font-medium ${
+                          r.status === "Paid"
+                            ? "bg-success/15 text-success"
+                            : r.status === "Due"
+                              ? "bg-destructive/15 text-destructive"
+                              : "bg-muted text-muted-foreground"
+                        }`}
+                      >
+                        {r.status === "Paid"
+                          ? t("loans.paid")
+                          : r.status === "Due"
+                            ? t("loans.due")
+                            : t("loans.upcoming")}
+                      </span>
                     </td>
                   </tr>
                 ))}
@@ -177,8 +233,26 @@ function CircularProgress({ pct }: { pct: number }) {
   return (
     <div className="relative h-16 w-16 shrink-0">
       <svg className="h-full w-full -rotate-90" viewBox="0 0 64 64">
-        <circle cx="32" cy="32" r={r} stroke="currentColor" strokeWidth="6" fill="none" className="text-muted" />
-        <circle cx="32" cy="32" r={r} stroke="url(#g)" strokeWidth="6" fill="none" strokeDasharray={c} strokeDashoffset={off} strokeLinecap="round" />
+        <circle
+          cx="32"
+          cy="32"
+          r={r}
+          stroke="currentColor"
+          strokeWidth="6"
+          fill="none"
+          className="text-muted"
+        />
+        <circle
+          cx="32"
+          cy="32"
+          r={r}
+          stroke="url(#g)"
+          strokeWidth="6"
+          fill="none"
+          strokeDasharray={c}
+          strokeDashoffset={off}
+          strokeLinecap="round"
+        />
         <defs>
           <linearGradient id="g" x1="0" y1="0" x2="1" y2="1">
             <stop offset="0%" stopColor="#2563EB" />
@@ -186,12 +260,19 @@ function CircularProgress({ pct }: { pct: number }) {
           </linearGradient>
         </defs>
       </svg>
-      <div className="absolute inset-0 grid place-items-center text-xs font-bold">{Math.round(pct)}%</div>
+      <div className="absolute inset-0 grid place-items-center text-xs font-bold">
+        {Math.round(pct)}%
+      </div>
     </div>
   );
 }
 
-function AddLoan({ onAdd }: { onAdd: (l: Parameters<ReturnType<typeof useStore>["addLoan"]>[0]) => void }) {
+function AddLoan({
+  onAdd,
+}: {
+  onAdd: (l: Parameters<ReturnType<typeof useStore>["addLoan"]>[0]) => void;
+}) {
+  const { t } = useI18n();
   const [open, setOpen] = useState(false);
   const [name, setName] = useState("");
   const [type, setType] = useState<string>(LOAN_TYPES[0]);
@@ -201,65 +282,137 @@ function AddLoan({ onAdd }: { onAdd: (l: Parameters<ReturnType<typeof useStore>[
   const [start, setStart] = useState(new Date().toISOString().slice(0, 10));
 
   const submit = () => {
-    const p = parseFloat(principal), r = parseFloat(rate), t = parseFloat(tenure);
+    const p = parseFloat(principal),
+      r = parseFloat(rate),
+      t = parseFloat(tenure);
     if (!name.trim() || !p || !r || !t) return toast.error("Fill all fields");
-    onAdd({ name: name.trim(), type, principal: p, rate: r, tenureMonths: t, startDate: new Date(start).toISOString() });
-    setOpen(false); setName(""); setPrincipal(""); setRate(""); setTenure("");
+    onAdd({
+      name: name.trim(),
+      type,
+      principal: p,
+      rate: r,
+      tenureMonths: t,
+      startDate: new Date(start).toISOString(),
+    });
+    setOpen(false);
+    setName("");
+    setPrincipal("");
+    setRate("");
+    setTenure("");
   };
 
   return (
     <Dialog open={open} onOpenChange={setOpen}>
       <DialogTrigger asChild>
-        <Button className="rounded-full bg-gradient-brand shadow-elegant"><Plus className="mr-1 h-4 w-4" /> Add Loan</Button>
+        <Button className="rounded-full bg-gradient-brand shadow-elegant">
+          <Plus className="mr-1 h-4 w-4" /> {t("loans.addLoan")}
+        </Button>
       </DialogTrigger>
       <DialogContent className="sm:max-w-md">
-        <DialogHeader><DialogTitle>Add Loan</DialogTitle></DialogHeader>
+        <DialogHeader>
+          <DialogTitle>{t("loans.addDialogTitle")}</DialogTitle>
+        </DialogHeader>
         <div className="grid gap-3 pt-2">
-          <div><Label>Loan name</Label><Input value={name} onChange={(e) => setName(e.target.value)} placeholder="e.g. Home Loan" /></div>
           <div>
-            <Label>Type</Label>
+            <Label>{t("loans.loanName")}</Label>
+            <Input
+              value={name}
+              onChange={(e) => setName(e.target.value)}
+              placeholder="e.g. Home Loan"
+            />
+          </div>
+          <div>
+            <Label>{t("loans.type")}</Label>
             <Select value={type} onValueChange={setType}>
-              <SelectTrigger><SelectValue /></SelectTrigger>
-              <SelectContent>{LOAN_TYPES.map((t) => <SelectItem key={t} value={t}>{t}</SelectItem>)}</SelectContent>
+              <SelectTrigger>
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                {LOAN_TYPES.map((t) => (
+                  <SelectItem key={t} value={t}>
+                    {t}
+                  </SelectItem>
+                ))}
+              </SelectContent>
             </Select>
           </div>
           <div className="grid grid-cols-2 gap-3">
-            <div><Label>Principal (₹)</Label><Input type="number" value={principal} onChange={(e) => setPrincipal(e.target.value)} /></div>
-            <div><Label>Interest %</Label><Input type="number" value={rate} onChange={(e) => setRate(e.target.value)} /></div>
-            <div><Label>Tenure (months)</Label><Input type="number" value={tenure} onChange={(e) => setTenure(e.target.value)} /></div>
-            <div><Label>Start date</Label><Input type="date" value={start} onChange={(e) => setStart(e.target.value)} /></div>
+            <div>
+              <Label>{t("loans.principalAmount")}</Label>
+              <Input
+                type="number"
+                value={principal}
+                onChange={(e) => setPrincipal(e.target.value)}
+              />
+            </div>
+            <div>
+              <Label>{t("loans.interestPercent")}</Label>
+              <Input type="number" value={rate} onChange={(e) => setRate(e.target.value)} />
+            </div>
+            <div>
+              <Label>{t("loans.tenureMonths")}</Label>
+              <Input type="number" value={tenure} onChange={(e) => setTenure(e.target.value)} />
+            </div>
+            <div>
+              <Label>{t("loans.startDate")}</Label>
+              <Input type="date" value={start} onChange={(e) => setStart(e.target.value)} />
+            </div>
           </div>
-          <Button onClick={submit} className="mt-2 w-full bg-gradient-brand">Save Loan</Button>
+          <Button onClick={submit} className="mt-2 w-full bg-gradient-brand">
+            {t("loans.saveLoan")}
+          </Button>
         </div>
       </DialogContent>
     </Dialog>
   );
 }
 
-function InterestCalc({ open, onOpenChange }: { open: boolean; onOpenChange: (b: boolean) => void }) {
+function InterestCalc({
+  open,
+  onOpenChange,
+}: {
+  open: boolean;
+  onOpenChange: (b: boolean) => void;
+}) {
+  const { t } = useI18n();
   const [p, setP] = useState("1000000");
   const [r, setR] = useState("9");
-  const [t, setT] = useState("120");
-  const emi = calcEmi(+p || 0, +r || 0, +t || 1);
-  const interest = emi * (+t || 1) - (+p || 0);
+  const [tenure, setTenure] = useState("120");
+  const emi = calcEmi(+p || 0, +r || 0, +tenure || 1);
+  const interest = emi * (+tenure || 1) - (+p || 0);
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="sm:max-w-md">
-        <DialogHeader><DialogTitle>EMI & Interest Calculator</DialogTitle></DialogHeader>
+        <DialogHeader>
+          <DialogTitle>{t("loans.calculatorTitle")}</DialogTitle>
+        </DialogHeader>
         <div className="grid gap-3 pt-2">
-          <div><Label>Principal (₹)</Label><Input type="number" value={p} onChange={(e) => setP(e.target.value)} /></div>
+          <div>
+            <Label>{t("loans.principalAmount")}</Label>
+            <Input type="number" value={p} onChange={(e) => setP(e.target.value)} />
+          </div>
           <div className="grid grid-cols-2 gap-3">
-            <div><Label>Interest %</Label><Input type="number" value={r} onChange={(e) => setR(e.target.value)} /></div>
-            <div><Label>Tenure (months)</Label><Input type="number" value={t} onChange={(e) => setT(e.target.value)} /></div>
+            <div>
+              <Label>{t("loans.interestPercent")}</Label>
+              <Input type="number" value={r} onChange={(e) => setR(e.target.value)} />
+            </div>
+            <div>
+              <Label>{t("loans.tenureMonths")}</Label>
+              <Input type="number" value={tenure} onChange={(e) => setTenure(e.target.value)} />
+            </div>
           </div>
           <div className="mt-2 grid grid-cols-2 gap-3">
             <div className="rounded-2xl bg-gradient-brand-soft p-4">
-              <div className="text-xs text-muted-foreground">Monthly EMI</div>
-              <div className="font-display text-xl font-bold text-primary">{inr(Math.round(emi))}</div>
+              <div className="text-xs text-muted-foreground">{t("loans.monthlyEmi")}</div>
+              <div className="font-display text-xl font-bold text-primary">
+                {inr(Math.round(emi))}
+              </div>
             </div>
             <div className="rounded-2xl bg-warning/10 p-4">
-              <div className="text-xs text-muted-foreground">Total Interest</div>
-              <div className="font-display text-xl font-bold text-warning">{inr(Math.round(interest))}</div>
+              <div className="text-xs text-muted-foreground">{t("loans.interest")}</div>
+              <div className="font-display text-xl font-bold text-warning">
+                {inr(Math.round(interest))}
+              </div>
             </div>
           </div>
         </div>

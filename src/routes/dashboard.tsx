@@ -15,15 +15,8 @@ import {
 } from "lucide-react";
 import { useStore, inr, calcEmi } from "@/lib/store";
 import { AppShell } from "@/components/AppShell";
-import {
-  ResponsiveContainer,
-  BarChart,
-  Bar,
-  XAxis,
-  YAxis,
-  Tooltip,
-  CartesianGrid,
-} from "recharts";
+import { useI18n } from "@/lib/i18n";
+import { ResponsiveContainer, BarChart, Bar, XAxis, YAxis, Tooltip, CartesianGrid } from "recharts";
 
 export const Route = createFileRoute("/dashboard")({
   head: () => ({
@@ -37,6 +30,7 @@ export const Route = createFileRoute("/dashboard")({
 
 function Dashboard() {
   const { data } = useStore();
+  const { t, language } = useI18n();
 
   const now = new Date();
   const monthStart = new Date(now.getFullYear(), now.getMonth(), 1);
@@ -50,21 +44,53 @@ function Dashboard() {
     .reduce((s, e) => s + e.amount, 0);
   const trend = prevTotal ? ((monthTotal - prevTotal) / prevTotal) * 100 : 0;
 
-  const totalLoanEmi = data.loans.reduce((s, l) => s + calcEmi(l.principal, l.rate, l.tenureMonths), 0);
+  const totalLoanEmi = data.loans.reduce(
+    (s, l) => s + calcEmi(l.principal, l.rate, l.tenureMonths),
+    0,
+  );
   const pendingTasks = data.notes.filter((n) => n.status === "Pending").length;
 
   const summary = [
-    { label: "Total Expenses (Month)", value: inr(monthTotal), icon: Wallet, trend, color: "from-blue-500 to-sky-400" },
-    { label: "Active Loans", value: String(data.loans.length), icon: Landmark, sub: `EMI ~ ${inr(totalLoanEmi)}/mo`, color: "from-violet-500 to-fuchsia-400" },
-    { label: "Documents Stored", value: String(data.documents.length), icon: FolderLock, sub: `${new Set(data.documents.map(d => d.category)).size} categories`, color: "from-emerald-500 to-teal-400" },
-    { label: "Pending Tasks", value: String(pendingTasks), icon: ClipboardList, sub: "in Smart Notes", color: "from-amber-500 to-orange-400" },
+    {
+      label: t("dashboard.totalExpenses"),
+      value: inr(monthTotal),
+      icon: Wallet,
+      trend,
+      color: "from-blue-500 to-sky-400",
+    },
+    {
+      label: t("dashboard.activeLoans"),
+      value: String(data.loans.length),
+      icon: Landmark,
+      sub: t("dashboard.emiMonthly", { value: inr(totalLoanEmi) }),
+      color: "from-violet-500 to-fuchsia-400",
+    },
+    {
+      label: t("dashboard.documentsStored"),
+      value: String(data.documents.length),
+      icon: FolderLock,
+      sub: t("dashboard.categories", {
+        count: new Set(data.documents.map((d) => d.category)).size,
+      }),
+      color: "from-emerald-500 to-teal-400",
+    },
+    {
+      label: t("dashboard.pendingTasks"),
+      value: String(pendingTasks),
+      icon: ClipboardList,
+      sub: t("dashboard.inSmartNotes"),
+      color: "from-amber-500 to-orange-400",
+    },
   ];
 
   // Weekly bar chart
   const last7 = [...Array(7)].map((_, i) => {
     const d = new Date();
     d.setDate(d.getDate() - (6 - i));
-    const label = d.toLocaleDateString("en-IN", { weekday: "short" });
+    const label = d.toLocaleDateString(
+      language === "en" ? "en-IN" : language === "hi" ? "hi-IN" : "te-IN",
+      { weekday: "short" },
+    );
     const total = data.expenses
       .filter((e) => new Date(e.date).toDateString() === d.toDateString())
       .reduce((s, e) => s + e.amount, 0);
@@ -73,10 +99,10 @@ function Dashboard() {
 
   // Quick actions
   const actions = [
-    { label: "Add Expense", to: "/expenses", icon: PlusCircle },
-    { label: "Upload Document", to: "/documents", icon: Upload },
-    { label: "Add Loan", to: "/loans", icon: Landmark },
-    { label: "Create Note", to: "/notes", icon: ClipboardList },
+    { label: t("dashboard.actions.addExpense"), to: "/expenses", icon: PlusCircle },
+    { label: t("dashboard.actions.uploadDocument"), to: "/documents", icon: Upload },
+    { label: t("dashboard.actions.addLoan"), to: "/loans", icon: Landmark },
+    { label: t("dashboard.actions.createNote"), to: "/notes", icon: ClipboardList },
   ] as const;
 
   // Reminders
@@ -90,28 +116,42 @@ function Dashboard() {
     ...data.notes
       .filter((n) => n.dueDate && n.status === "Pending")
       .slice(0, 3)
-      .map((n) => ({ title: n.title, sub: `Due ${new Date(n.dueDate!).toLocaleDateString()}`, urgent: n.priority === "High" })),
+      .map((n) => ({
+        title: n.title,
+        sub: `Due ${new Date(n.dueDate!).toLocaleDateString()}`,
+        urgent: n.priority === "High",
+      })),
   ].slice(0, 5);
 
   // AI Insights
-  const fuelMonth = monthExpenses.filter((e) => e.category === "Fuel").reduce((s, e) => s + e.amount, 0);
+  const fuelMonth = monthExpenses
+    .filter((e) => e.category === "Fuel")
+    .reduce((s, e) => s + e.amount, 0);
   const fuelPrev = data.expenses
-    .filter((e) => e.category === "Fuel" && new Date(e.date) >= prevMonthStart && new Date(e.date) < prevMonthEnd)
+    .filter(
+      (e) =>
+        e.category === "Fuel" &&
+        new Date(e.date) >= prevMonthStart &&
+        new Date(e.date) < prevMonthEnd,
+    )
     .reduce((s, e) => s + e.amount, 0);
   const fuelDelta = fuelPrev ? Math.round(((fuelMonth - fuelPrev) / fuelPrev) * 100) : 0;
 
   const insights = [
     fuelDelta !== 0
-      ? `Fuel expenses ${fuelDelta > 0 ? "increased" : "decreased"} by ${Math.abs(fuelDelta)}% vs last month.`
-      : "Fuel spending is steady — well managed!",
+      ? t("dashboard.saveMoney", {
+          direction: fuelDelta > 0 ? "increased" : "decreased",
+          value: Math.abs(fuelDelta),
+        })
+      : t("dashboard.spendTrendDown"),
     monthTotal > prevTotal
-      ? `Overall spending is up ${Math.round(trend)}% this month. Review top categories.`
-      : "You're spending less than last month. Great discipline! 💪",
-    "Tip: Set aside 20% of income for savings before spending.",
+      ? t("dashboard.spendTrendUp", { value: Math.round(trend) })
+      : t("dashboard.spendTrendDown"),
+    t("dashboard.savingsTip"),
   ];
 
   return (
-    <AppShell title="Welcome back, Dad 👋" subtitle="Here's your family at a glance">
+    <AppShell title={t("dashboard.title")} subtitle={t("dashboard.subtitle")}>
       {/* Summary cards */}
       <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
         {summary.map((s, i) => {
@@ -124,14 +164,24 @@ function Dashboard() {
               transition={{ delay: i * 0.05 }}
               className="group relative overflow-hidden rounded-3xl border border-border bg-card p-5 shadow-soft transition-all hover:-translate-y-0.5 hover:shadow-elegant"
             >
-              <div className={`absolute -right-6 -top-6 h-24 w-24 rounded-full bg-gradient-to-br ${s.color} opacity-10 blur-2xl`} />
+              <div
+                className={`absolute -right-6 -top-6 h-24 w-24 rounded-full bg-gradient-to-br ${s.color} opacity-10 blur-2xl`}
+              />
               <div className="flex items-center justify-between">
-                <div className={`grid h-10 w-10 place-items-center rounded-xl bg-gradient-to-br ${s.color} text-white shadow-soft`}>
+                <div
+                  className={`grid h-10 w-10 place-items-center rounded-xl bg-gradient-to-br ${s.color} text-white shadow-soft`}
+                >
                   <Icon className="h-5 w-5" />
                 </div>
                 {"trend" in s && s.trend !== undefined && s.trend !== 0 && (
-                  <div className={`flex items-center gap-1 rounded-full px-2 py-0.5 text-xs font-medium ${s.trend > 0 ? "bg-destructive/10 text-destructive" : "bg-success/10 text-success"}`}>
-                    {s.trend > 0 ? <TrendingUp className="h-3 w-3" /> : <TrendingDown className="h-3 w-3" />}
+                  <div
+                    className={`flex items-center gap-1 rounded-full px-2 py-0.5 text-xs font-medium ${s.trend > 0 ? "bg-destructive/10 text-destructive" : "bg-success/10 text-success"}`}
+                  >
+                    {s.trend > 0 ? (
+                      <TrendingUp className="h-3 w-3" />
+                    ) : (
+                      <TrendingDown className="h-3 w-3" />
+                    )}
                     {Math.abs(Math.round(s.trend))}%
                   </div>
                 )}
@@ -149,10 +199,12 @@ function Dashboard() {
         <div className="rounded-3xl border border-border bg-card p-6 shadow-soft lg:col-span-2">
           <div className="flex items-center justify-between">
             <div>
-              <h3 className="font-display text-lg font-bold">Last 7 days</h3>
-              <p className="text-sm text-muted-foreground">Daily spending overview</p>
+              <h3 className="font-display text-lg font-bold">{t("dashboard.last7Days")}</h3>
+              <p className="text-sm text-muted-foreground">{t("dashboard.dailySpending")}</p>
             </div>
-            <Link to="/expenses" className="text-sm font-medium text-primary hover:underline">View all →</Link>
+            <Link to="/expenses" className="text-sm font-medium text-primary hover:underline">
+              {t("dashboard.viewAll")}
+            </Link>
           </div>
           <div className="mt-6 h-64">
             <ResponsiveContainer width="100%" height="100%">
@@ -164,7 +216,13 @@ function Dashboard() {
                   </linearGradient>
                 </defs>
                 <CartesianGrid stroke="#e2e8f0" strokeDasharray="3 3" vertical={false} />
-                <XAxis dataKey="day" stroke="#64748b" fontSize={12} tickLine={false} axisLine={false} />
+                <XAxis
+                  dataKey="day"
+                  stroke="#64748b"
+                  fontSize={12}
+                  tickLine={false}
+                  axisLine={false}
+                />
                 <YAxis stroke="#64748b" fontSize={12} tickLine={false} axisLine={false} />
                 <Tooltip
                   cursor={{ fill: "rgba(37,99,235,0.06)" }}
@@ -179,7 +237,7 @@ function Dashboard() {
 
         <div className="rounded-3xl bg-gradient-brand p-6 text-white shadow-glow">
           <div className="flex items-center gap-2 text-sm font-medium text-white/90">
-            <Sparkles className="h-4 w-4" /> AI Insights
+            <Sparkles className="h-4 w-4" /> {t("dashboard.aiInsights")}
           </div>
           <ul className="mt-5 space-y-4">
             {insights.map((t, i) => (
@@ -195,7 +253,7 @@ function Dashboard() {
       {/* Quick actions + reminders */}
       <div className="mt-6 grid gap-5 lg:grid-cols-3">
         <div className="rounded-3xl border border-border bg-card p-6 shadow-soft lg:col-span-2">
-          <h3 className="font-display text-lg font-bold">Quick actions</h3>
+          <h3 className="font-display text-lg font-bold">{t("dashboard.quickActions")}</h3>
           <div className="mt-5 grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
             {actions.map((a) => {
               const Icon = a.icon;
@@ -218,13 +276,20 @@ function Dashboard() {
 
         <div className="rounded-3xl border border-border bg-card p-6 shadow-soft">
           <div className="flex items-center gap-2 font-display text-lg font-bold">
-            <Bell className="h-5 w-5 text-primary" /> Upcoming
+            <Bell className="h-5 w-5 text-primary" /> {t("dashboard.upcoming")}
           </div>
           <ul className="mt-4 space-y-3">
-            {reminders.length === 0 && <li className="text-sm text-muted-foreground">All clear! 🎉</li>}
+            {reminders.length === 0 && (
+              <li className="text-sm text-muted-foreground">{t("dashboard.allClear")}</li>
+            )}
             {reminders.map((r, i) => (
-              <li key={i} className="flex items-start gap-3 rounded-xl border border-border bg-background p-3">
-                <span className={`mt-1 h-2 w-2 shrink-0 rounded-full ${r.urgent ? "bg-destructive" : "bg-warning"}`} />
+              <li
+                key={i}
+                className="flex items-start gap-3 rounded-xl border border-border bg-background p-3"
+              >
+                <span
+                  className={`mt-1 h-2 w-2 shrink-0 rounded-full ${r.urgent ? "bg-destructive" : "bg-warning"}`}
+                />
                 <div className="min-w-0">
                   <div className="truncate text-sm font-medium">{r.title}</div>
                   <div className="text-xs text-muted-foreground">{r.sub}</div>

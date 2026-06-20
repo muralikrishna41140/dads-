@@ -14,11 +14,24 @@ import {
 } from "lucide-react";
 import { useStore, DOC_CATEGORIES } from "@/lib/store";
 import { AppShell } from "@/components/AppShell";
+import { useI18n } from "@/lib/i18n";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogTrigger,
+} from "@/components/ui/dialog";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 import { toast } from "sonner";
 
 export const Route = createFileRoute("/documents")({
@@ -29,12 +42,15 @@ export const Route = createFileRoute("/documents")({
 function Documents() {
   const { data, addDocument, deleteDocument } = useStore();
   const [q, setQ] = useState("");
-  const [preview, setPreview] = useState<typeof data.documents[number] | null>(null);
+  const { t } = useI18n();
+  const [preview, setPreview] = useState<(typeof data.documents)[number] | null>(null);
 
   const filtered = data.documents.filter((d) =>
     [d.name, d.category, d.fileName ?? ""].join(" ").toLowerCase().includes(q.toLowerCase()),
   );
-  const recent = [...data.documents].sort((a, b) => +new Date(b.uploadedAt) - +new Date(a.uploadedAt)).slice(0, 4);
+  const recent = [...data.documents]
+    .sort((a, b) => +new Date(b.uploadedAt) - +new Date(a.uploadedAt))
+    .slice(0, 4);
   const expiring = data.documents.filter((d) => {
     if (!d.expiresOn) return false;
     const days = (new Date(d.expiresOn).getTime() - Date.now()) / 86400000;
@@ -48,25 +64,35 @@ function Documents() {
   };
 
   return (
-    <AppShell title="Documents Vault" subtitle="Every important document, secure and ready">
+    <AppShell title={t("documents.title")} subtitle={t("documents.subtitle")}>
       <div className="grid gap-4 sm:grid-cols-3">
         <div className="rounded-3xl border border-border bg-card p-5 shadow-soft">
-          <div className="text-xs font-medium text-muted-foreground">Total Documents</div>
+          <div className="text-xs font-medium text-muted-foreground">
+            {t("documents.totalDocuments")}
+          </div>
           <div className="mt-1 font-display text-2xl font-bold">{data.documents.length}</div>
         </div>
         <div className="rounded-3xl border border-border bg-card p-5 shadow-soft">
-          <div className="text-xs font-medium text-muted-foreground">Categories</div>
-          <div className="mt-1 font-display text-2xl font-bold">{new Set(data.documents.map(d => d.category)).size}</div>
+          <div className="text-xs font-medium text-muted-foreground">
+            {t("documents.categories")}
+          </div>
+          <div className="mt-1 font-display text-2xl font-bold">
+            {new Set(data.documents.map((d) => d.category)).size}
+          </div>
         </div>
         <div className="rounded-3xl border border-warning/30 bg-warning/10 p-5 shadow-soft">
-          <div className="flex items-center gap-1.5 text-xs font-medium text-warning"><AlertTriangle className="h-3.5 w-3.5" /> Expiring soon</div>
+          <div className="flex items-center gap-1.5 text-xs font-medium text-warning">
+            <AlertTriangle className="h-3.5 w-3.5" /> {t("documents.expiringSoon")}
+          </div>
           <div className="mt-1 font-display text-2xl font-bold text-warning">{expiring.length}</div>
         </div>
       </div>
 
       {expiring.length > 0 && (
         <div className="mt-6 rounded-3xl border border-warning/30 bg-warning/5 p-5">
-          <div className="flex items-center gap-2 text-sm font-semibold text-warning"><ShieldAlert className="h-4 w-4" /> Expiry alerts</div>
+          <div className="flex items-center gap-2 text-sm font-semibold text-warning">
+            <ShieldAlert className="h-4 w-4" /> {t("documents.expiryAlerts")}
+          </div>
           <ul className="mt-3 grid gap-2 sm:grid-cols-2">
             {expiring.map((d) => {
               const days = Math.ceil((new Date(d.expiresOn!).getTime() - Date.now()) / 86400000);
@@ -84,14 +110,16 @@ function Documents() {
       {/* Recent */}
       <div className="mt-6">
         <div className="mb-3 flex items-center justify-between">
-          <h3 className="font-display text-lg font-bold">Recent uploads</h3>
+          <h3 className="font-display text-lg font-bold">{t("documents.recentUploads")}</h3>
         </div>
         <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
           {recent.map((d) => (
             <div key={d.id} className="rounded-2xl border border-border bg-gradient-brand-soft p-4">
               <FileText className="h-6 w-6 text-primary" />
               <div className="mt-3 truncate text-sm font-semibold">{d.name}</div>
-              <div className="text-xs text-muted-foreground">{new Date(d.uploadedAt).toLocaleDateString()}</div>
+              <div className="text-xs text-muted-foreground">
+                {new Date(d.uploadedAt).toLocaleDateString()}
+              </div>
             </div>
           ))}
         </div>
@@ -101,9 +129,19 @@ function Documents() {
       <div className="mt-8 flex flex-wrap items-center gap-3">
         <div className="relative flex-1 min-w-[200px]">
           <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
-          <Input value={q} onChange={(e) => setQ(e.target.value)} placeholder="Search documents…" className="pl-9 rounded-full" />
+          <Input
+            value={q}
+            onChange={(e) => setQ(e.target.value)}
+            placeholder={t("documents.search")}
+            className="pl-9 rounded-full"
+          />
         </div>
-        <UploadDocument onAdd={(d) => { addDocument(d); toast.success("Document added"); }} />
+        <UploadDocument
+          onAdd={(d) => {
+            addDocument(d);
+            toast.success("Document added");
+          }}
+        />
       </div>
 
       {/* Grid */}
@@ -128,13 +166,29 @@ function Documents() {
               </div>
             )}
             <div className="mt-4 flex items-center gap-1">
-              <Button size="sm" variant="outline" className="rounded-full text-xs" onClick={() => setPreview(d)}>
-                <Eye className="mr-1 h-3.5 w-3.5" /> View
+              <Button
+                size="sm"
+                variant="outline"
+                className="rounded-full text-xs"
+                onClick={() => setPreview(d)}
+              >
+                <Eye className="mr-1 h-3.5 w-3.5" /> {t("documents.view")}
               </Button>
-              <Button size="sm" variant="outline" className="rounded-full text-xs" onClick={() => share(d.name)}>
-                <Share2 className="mr-1 h-3.5 w-3.5" /> Share
+              <Button
+                size="sm"
+                variant="outline"
+                className="rounded-full text-xs"
+                onClick={() => share(d.name)}
+              >
+                <Share2 className="mr-1 h-3.5 w-3.5" /> {t("documents.share")}
               </Button>
-              <button onClick={() => { deleteDocument(d.id); toast("Deleted"); }} className="ml-auto rounded-lg p-1.5 text-muted-foreground hover:bg-destructive/10 hover:text-destructive">
+              <button
+                onClick={() => {
+                  deleteDocument(d.id);
+                  toast(t("documents.deleteToast"));
+                }}
+                className="ml-auto rounded-lg p-1.5 text-muted-foreground hover:bg-destructive/10 hover:text-destructive"
+              >
                 <Trash2 className="h-4 w-4" />
               </button>
             </div>
@@ -145,21 +199,34 @@ function Documents() {
       {/* Preview */}
       <Dialog open={!!preview} onOpenChange={(b) => !b && setPreview(null)}>
         <DialogContent>
-          <DialogHeader><DialogTitle>{preview?.name}</DialogTitle></DialogHeader>
+          <DialogHeader>
+            <DialogTitle>{preview?.name}</DialogTitle>
+          </DialogHeader>
           <div className="grid place-items-center rounded-2xl border border-dashed border-border bg-muted/40 py-16 text-sm text-muted-foreground">
             {preview?.dataUrl ? (
               preview.dataUrl.startsWith("data:image") ? (
-                <img src={preview.dataUrl} alt={preview.name} className="max-h-96 rounded-xl object-contain" />
+                <img
+                  src={preview.dataUrl}
+                  alt={preview.name}
+                  className="max-h-96 rounded-xl object-contain"
+                />
               ) : (
-                <a href={preview.dataUrl} download={preview.fileName} className="text-primary underline">Download file</a>
+                <a
+                  href={preview.dataUrl}
+                  download={preview.fileName}
+                  className="text-primary underline"
+                >
+                  {t("documents.downloadFile")}
+                </a>
               )
             ) : (
-              <>📄 Preview not available · Securely stored</>
+              <>{t("documents.previewNotAvailable")}</>
             )}
           </div>
           {preview && (
             <div className="text-xs text-muted-foreground">
-              Category: {preview.category} · Uploaded {new Date(preview.uploadedAt).toLocaleDateString()}
+              Category: {preview.category} · Uploaded{" "}
+              {new Date(preview.uploadedAt).toLocaleDateString()}
             </div>
           )}
         </DialogContent>
@@ -168,7 +235,12 @@ function Documents() {
   );
 }
 
-function UploadDocument({ onAdd }: { onAdd: (d: Parameters<ReturnType<typeof useStore>["addDocument"]>[0]) => void }) {
+function UploadDocument({
+  onAdd,
+}: {
+  onAdd: (d: Parameters<ReturnType<typeof useStore>["addDocument"]>[0]) => void;
+}) {
+  const { t } = useI18n();
   const [open, setOpen] = useState(false);
   const [name, setName] = useState("");
   const [cat, setCat] = useState<string>(DOC_CATEGORIES[0]);
@@ -177,7 +249,7 @@ function UploadDocument({ onAdd }: { onAdd: (d: Parameters<ReturnType<typeof use
   const [drag, setDrag] = useState(false);
 
   const submit = async () => {
-    if (!name.trim()) return toast.error("Enter a document name");
+    if (!name.trim()) return toast.error(t("documents.enterName"));
     let dataUrl: string | undefined;
     if (file && file.size < 2_000_000) {
       dataUrl = await new Promise<string>((res, rej) => {
@@ -194,40 +266,80 @@ function UploadDocument({ onAdd }: { onAdd: (d: Parameters<ReturnType<typeof use
       dataUrl,
       expiresOn: expires ? new Date(expires).toISOString() : undefined,
     });
-    setOpen(false); setName(""); setExpires(""); setFile(null);
+    setOpen(false);
+    setName("");
+    setExpires("");
+    setFile(null);
   };
 
   return (
     <Dialog open={open} onOpenChange={setOpen}>
       <DialogTrigger asChild>
-        <Button className="rounded-full bg-gradient-brand shadow-elegant"><Plus className="mr-1 h-4 w-4" /> Upload</Button>
+        <Button className="rounded-full bg-gradient-brand shadow-elegant">
+          <Plus className="mr-1 h-4 w-4" /> {t("documents.upload")}
+        </Button>
       </DialogTrigger>
       <DialogContent className="sm:max-w-md">
-        <DialogHeader><DialogTitle>Upload document</DialogTitle></DialogHeader>
+        <DialogHeader>
+          <DialogTitle>{t("documents.uploadDocument")}</DialogTitle>
+        </DialogHeader>
         <div className="grid gap-3 pt-2">
-          <div><Label>Name</Label><Input value={name} onChange={(e) => setName(e.target.value)} placeholder="e.g. Car Insurance" /></div>
           <div>
-            <Label>Category</Label>
+            <Label>{t("documents.name")}</Label>
+            <Input
+              value={name}
+              onChange={(e) => setName(e.target.value)}
+              placeholder="e.g. Car Insurance"
+            />
+          </div>
+          <div>
+            <Label>{t("documents.category")}</Label>
             <Select value={cat} onValueChange={setCat}>
-              <SelectTrigger><SelectValue /></SelectTrigger>
-              <SelectContent>{DOC_CATEGORIES.map((c) => <SelectItem key={c} value={c}>{c}</SelectItem>)}</SelectContent>
+              <SelectTrigger>
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                {DOC_CATEGORIES.map((c) => (
+                  <SelectItem key={c} value={c}>
+                    {c}
+                  </SelectItem>
+                ))}
+              </SelectContent>
             </Select>
           </div>
-          <div><Label>Expiry date (optional)</Label><Input type="date" value={expires} onChange={(e) => setExpires(e.target.value)} /></div>
           <div>
-            <Label>File</Label>
+            <Label>{t("documents.expiryDate")}</Label>
+            <Input type="date" value={expires} onChange={(e) => setExpires(e.target.value)} />
+          </div>
+          <div>
+            <Label>{t("documents.file")}</Label>
             <label
-              onDragOver={(e) => { e.preventDefault(); setDrag(true); }}
+              onDragOver={(e) => {
+                e.preventDefault();
+                setDrag(true);
+              }}
               onDragLeave={() => setDrag(false)}
-              onDrop={(e) => { e.preventDefault(); setDrag(false); if (e.dataTransfer.files[0]) setFile(e.dataTransfer.files[0]); }}
+              onDrop={(e) => {
+                e.preventDefault();
+                setDrag(false);
+                if (e.dataTransfer.files[0]) setFile(e.dataTransfer.files[0]);
+              }}
               className={`mt-1 grid cursor-pointer place-items-center rounded-2xl border-2 border-dashed py-8 text-sm transition-colors ${drag ? "border-primary bg-primary/5" : "border-border bg-muted/40"}`}
             >
               <Upload className="h-6 w-6 text-muted-foreground" />
-              <span className="mt-2 text-muted-foreground">{file ? file.name : "Drag & drop or click to upload"}</span>
-              <input type="file" className="hidden" onChange={(e) => setFile(e.target.files?.[0] ?? null)} />
+              <span className="mt-2 text-muted-foreground">
+                {file ? file.name : t("documents.dragDrop")}
+              </span>
+              <input
+                type="file"
+                className="hidden"
+                onChange={(e) => setFile(e.target.files?.[0] ?? null)}
+              />
             </label>
           </div>
-          <Button onClick={submit} className="mt-2 w-full bg-gradient-brand">Save Document</Button>
+          <Button onClick={submit} className="mt-2 w-full bg-gradient-brand">
+            {t("documents.saveDocument")}
+          </Button>
         </div>
       </DialogContent>
     </Dialog>

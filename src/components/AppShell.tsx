@@ -11,19 +11,30 @@ import {
   X,
 } from "lucide-react";
 import { useState, type ReactNode } from "react";
+import { LanguageSwitcher } from "@/components/LanguageSwitcher";
+import { useI18n } from "@/lib/i18n";
 import { cn } from "@/lib/utils";
 
 const nav = [
-  { to: "/dashboard", label: "Dashboard", icon: LayoutDashboard },
-  { to: "/expenses", label: "Expenses", icon: Wallet },
-  { to: "/documents", label: "Documents", icon: FolderLock },
-  { to: "/loans", label: "Bank & Loans", icon: Landmark },
-  { to: "/notes", label: "Smart Notes", icon: StickyNote },
+  { to: "/dashboard", labelKey: "Dashboard", icon: LayoutDashboard },
+  { to: "/expenses", labelKey: "Expenses", icon: Wallet },
+  { to: "/documents", labelKey: "Documents", icon: FolderLock },
+  { to: "/loans", labelKey: "Bank & Loans", icon: Landmark },
+  { to: "/notes", labelKey: "Smart Notes", icon: StickyNote },
 ] as const;
 
-export function AppShell({ children, title, subtitle }: { children: ReactNode; title: string; subtitle?: string }) {
+export function AppShell({
+  children,
+  title,
+  subtitle,
+}: {
+  children: ReactNode;
+  title: string;
+  subtitle?: string;
+}) {
   const [open, setOpen] = useState(false);
   const pathname = useRouterState({ select: (s) => s.location.pathname });
+  const { t } = useI18n();
 
   return (
     <div className="min-h-screen bg-background">
@@ -39,8 +50,8 @@ export function AppShell({ children, title, subtitle }: { children: ReactNode; t
             <Heart className="h-5 w-5 fill-white text-white" />
           </div>
           <div>
-            <div className="font-display text-lg font-bold leading-tight">DadDesk AI</div>
-            <div className="text-xs text-sidebar-foreground/60">For dads who do it all</div>
+            <div className="font-display text-lg font-bold leading-tight">{t("app.brand")}</div>
+            <div className="text-xs text-sidebar-foreground/60">{t("app.tagline")}</div>
           </div>
         </div>
 
@@ -48,6 +59,16 @@ export function AppShell({ children, title, subtitle }: { children: ReactNode; t
           {nav.map((item) => {
             const active = pathname.startsWith(item.to);
             const Icon = item.icon;
+            const label =
+              item.labelKey === "Dashboard"
+                ? t("app.navDashboard")
+                : item.labelKey === "Expenses"
+                  ? t("app.navExpenses")
+                  : item.labelKey === "Documents"
+                    ? t("app.navDocuments")
+                    : item.labelKey === "Bank & Loans"
+                      ? t("app.navLoans")
+                      : t("app.navNotes");
             return (
               <Link
                 key={item.to}
@@ -67,17 +88,15 @@ export function AppShell({ children, title, subtitle }: { children: ReactNode; t
                   />
                 )}
                 <Icon className="h-4 w-4 shrink-0" />
-                <span>{item.label}</span>
+                <span>{label}</span>
               </Link>
             );
           })}
         </nav>
 
         <div className="m-4 rounded-2xl bg-gradient-brand p-4 text-white shadow-glow">
-          <div className="text-sm font-semibold">Happy Father's Day ❤️</div>
-          <p className="mt-1 text-xs text-white/85">
-            You manage so much. We're here to make it lighter.
-          </p>
+          <div className="text-sm font-semibold">{t("app.fatherDay")}</div>
+          <p className="mt-1 text-xs text-white/85">{t("app.support")}</p>
         </div>
       </aside>
 
@@ -104,11 +123,12 @@ export function AppShell({ children, title, subtitle }: { children: ReactNode; t
               <h1 className="truncate font-display text-xl font-bold sm:text-2xl">{title}</h1>
               {subtitle && <p className="truncate text-sm text-muted-foreground">{subtitle}</p>}
             </div>
+            <LanguageSwitcher className="hidden sm:block" />
             <Link
               to="/"
               className="hidden rounded-full border border-border bg-card px-4 py-2 text-xs font-medium text-muted-foreground transition-colors hover:bg-accent hover:text-foreground sm:inline-flex"
             >
-              ← Home
+              ← {t("app.home")}
             </Link>
           </div>
         </header>

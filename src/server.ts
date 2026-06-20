@@ -7,6 +7,84 @@ type ServerEntry = {
   fetch: (request: Request, env: unknown, ctx: unknown) => Promise<Response> | Response;
 };
 
+type GeminiChatRequest = {
+  message?: string;
+  context?: unknown;
+};
+
+async function handleGeminiChat(request: Request, env: unknown): Promise<Response> {
+  if (request.method !== "POST") {
+    return new Response(JSON.stringify({ error: "Method not allowed" }), {
+      status: 405,
+      headers: { "content-type": "application/json" },
+    });
+  }
+
+  const runtimeEnv = env as Record<string, string | undefined>;
+  const apiKey =
+    runtimeEnv?.GEMINI_API_KEY ??
+    runtimeEnv?.VITE_GEMINI_API_KEY ??
+    process.env.GEMINI_API_KEY ??
+    process.env.VITE_GEMINI_API_KEY;
+
+  if (!apiKey) {
+    return new Response(JSON.stringify({ reply: "" }), {
+      status: 200,
+      headers: { "content-type": "application/json" },
+    });
+  }
+
+  const body = (await request.json()) as GeminiChatRequest;
+  const message = body.message?.trim();
+  if (!message) {
+    return new Response(JSON.stringify({ error: "Message is required" }), {
+      status: 400,
+      headers: { "content-type": "application/json" },
+    });
+  }
+
+  const prompt = [
+    "You are DadDesk AI, a concise assistant for a family finance dashboard.",
+    "Use the provided app context when relevant. If the context is insufficient, answer clearly and briefly.",
+    "Return plain text only.",
+    "",
+    `App context: ${JSON.stringify(body.context ?? {}, null, 2)}`,
+    `User message: ${message}`,
+  ].join("\n");
+
+  const response = await fetch(
+    `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key=${apiKey}`,
+    {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({
+        contents: [
+          {
+            role: "user",
+            parts: [{ text: prompt }],
+          },
+        ],
+      }),
+    },
+  );
+
+  if (!response.ok) {
+    return new Response(JSON.stringify({ reply: "" }), {
+      status: 200,
+      headers: { "content-type": "application/json" },
+    });
+  }
+
+  const result = (await response.json()) as {
+    candidates?: Array<{ content?: { parts?: Array<{ text?: string }> } }>;
+  };
+  const reply = result.candidates?.[0]?.content?.parts?.[0]?.text?.trim() ?? "";
+
+  return new Response(JSON.stringify({ reply }), {
+    headers: { "content-type": "application/json" },
+  });
+}
+
 let serverEntryPromise: Promise<ServerEntry> | undefined;
 
 async function getServerEntry(): Promise<ServerEntry> {
@@ -40,6 +118,11 @@ async function normalizeCatastrophicSsrResponse(response: Response): Promise<Res
 export default {
   async fetch(request: Request, env: unknown, ctx: unknown) {
     try {
+      const url = new URL(request.url);
+      if (url.pathname === "/api/gemini-chat") {
+        return await handleGeminiChat(request, env);
+      }
+
       const handler = await getServerEntry();
       const response = await handler.fetch(request, env, ctx);
       return await normalizeCatastrophicSsrResponse(response);
